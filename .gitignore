@@ -1,3 +1,4 @@
 jupyter_notebooks/
-source_files/
+old_source_files/
 build_docker.sh
+personal/

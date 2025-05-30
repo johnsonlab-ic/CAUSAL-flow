@@ -2,31 +2,45 @@ process clump_gwas {
     tag "Clumping GWAS data"
     label 'process_medium'
     
-    publishDir "${params.output_dir}/processed_data", mode: 'copy'
+    publishDir "${params.outdir}/clumped_gwas/", mode: 'copy'
     
     input:
+    path source_R
     path gwas_file
+    val pvalue
+    val window_size
     
     output:
     path "clumped_gwas.rds", emit: clumped_gwas
     
     script:
+
     """
     #!/usr/bin/env Rscript
-    
-    # Load libraries
+    library(tidyverse)
     library(data.table)
+    library(ieugwasr)
     
-    # Read GWAS data
-    gwas <- fread("${gwas_file}")
+    #load functions
+    source("$source_R")
+    # Load example GWAS data
+    gwas <- fread("$gwas_file")
     
-    # Clump GWAS data
-    # ... clumping steps ...
+    # Define parameters
+    pval <- as.numeric("$pvalue")        
+    window <- as.numeric("$window_size")   
     
-    # Save clumped data
-    saveRDS(gwas, "clumped_gwas.rds")
-    """
-}
-
+    # Run region selection
+    regions <- select_regions(
+        gwas = gwas,
+        pval = pval,
+        window = window,
+        plink_bin = genetics.binaRies::get_plink_binary(),
+        path_to_binaries = "/app/COLOC-flow/EUR"
+    )
+    
+    # Save results
+    saveRDS(regions, "clumped_gwas.rds")    
+    
     """
 }
