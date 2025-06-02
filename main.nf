@@ -34,6 +34,7 @@ params.gwas_file="/var/lib/docker/alex_tmp/data/COLOC-flow_test/sc_eqtls/GWAS/Ep
 params.pvalue=5e-8
 params.window_size=1e6
 
+
 workflow{
 
     clump_gwas(source_R="${baseDir}/R/clump_gwas_source.R",
