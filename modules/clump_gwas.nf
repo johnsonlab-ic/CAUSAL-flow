@@ -1,5 +1,5 @@
 process clump_gwas {
-    tag "Clumping GWAS data"
+    tag "Clumping ${gwas_name}"
     label 'process_medium'
     
     publishDir "${params.outdir}/clumped_gwas/", mode: 'copy'
@@ -9,9 +9,10 @@ process clump_gwas {
     path gwas_file
     val pvalue
     val window_size
+    val gwas_name
     
     output:
-    path "clumped_gwas.rds", emit: clumped_gwas
+    path "*clumped_gwas.rds", emit: clumped_gwas
     
     script:
 
@@ -25,6 +26,7 @@ process clump_gwas {
     source("$source_R")
     # Load example GWAS data
     gwas <- fread("$gwas_file")
+
     
     # Define parameters
     pval <- as.numeric("$pvalue")        
@@ -40,7 +42,7 @@ process clump_gwas {
     )
     
     # Save results
-    saveRDS(regions, "clumped_gwas.rds")    
+    saveRDS(regions, paste0("$gwas_name","_clumped_gwas.rds"))
     
     """
 }

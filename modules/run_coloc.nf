@@ -1,86 +1,134 @@
 process run_coloc {
-    tag "Running colocalization analysis using cellCOLOC"
+    tag "Running colocalization analysis for ${eqtl_name} and ${gwas_name}"
     label 'process_high'
     
-    publishDir "${params.output_dir}/coloc_results", mode: 'copy'
+    publishDir "${params.outdir}/coloc_results", mode: 'copy'
     
     input:
+    path source_R
     path gwas_data
-    path eqtl_data
+    val gwas_name
+    tuple path(eqtl_data), val(eqtl_name)
     path gene_loc_file
-    path maf_file
-    path snp_locs_file
-    path indiv_numbers_file
     
     output:
-    path "*_cellCOLOC_obj.rds", emit: coloc_obj
-    path "*_COLOC_results.txt", emit: coloc_results
-    path "*.pdf", optional: true, emit: plots
+    path "coloc_results_${eqtl_name}.txt", emit: results_table
+
         
+    script:
+    
     """
     #!/usr/bin/env Rscript
     
-    # Source the cellCOLOC functions
-    source("${baseDir}/source_files/cellCOLOC_source.r")
+    # Source the colocalization functions
+    source("${source_R}")
     
-    # Load processed data
-    gwas <- readRDS("${gwas_data}")
-    mateqtlouts <- readRDS("${eqtl_data}")
+    # Set defaults
+    trait_type <- "cc"  # Assuming all trait types are case-control 
+    min_snps <- 100     # Minimum SNPs per region set to 100
+    eqtl_name <- "${eqtl_name}"
+    gwas_name <- "${gwas_name}"
+
+
+    # Load required libraries
+    library(tidyverse)
+    library(data.table)
     
-    # Run cellCOLOC analysis
-    cellCOLOC(
-        GWAS = gwas,
-        mateqtlouts = mateqtlouts,
-        gene_loc_file = "${gene_loc_file}",
-        maf_file = "${maf_file}",
-        snp_locs_file = "${snp_locs_file}",
-        indiv_numbers_file = "${indiv_numbers_file}",
-        preprocess_mateqtlouts = TRUE,
-        preprocess_GWAS = TRUE,
-        GWASsignif = 5e-8,
-        GWAS_window = 1e6,
-        GWAS_type = "${gwas_type}",
-        GWAS_name = "${gwas_name}",
-        cellMR = ${run_cellm
-        IVPCA = ${run_ivpca},
-        pph4_cutoff = ${pph4_cutoff},
-        use_coloc_lead_snp = TRUE
-    )
-    
-    # Generate regional plots if we have colocalized regions
-    coloc_results <- read.table("${gwas_name}_COLOC_results.txt", header=TRUE)
-    
-    # Filter for significant colocalizations
-    sig_coloc <- coloc_results[coloc_results\$PP.H4 > ${pph4_cutoff},]
-    
-    if (nrow(sig_coloc) > 0) {
-        # Load the cellCOLOC object
-        cellCOLOC_obj <- readRDS("${gwas_name}_cellCOLOC_obj.rds")
-        
-        # For each significant colocalization, create a regional plot
-        for (i in 1:nrow(sig_coloc)) {
-            gene <- sig_coloc\$gene[i]
-            celltype <- sig_coloc\$cellType[i]
-            
-            tryCatch({
-                plot <- create_regional_association_plot(
-                    cellCOLOC_obj,
-                    gene = gene,
-                    celltype = celltype,
-                    gwas_name = "${gwas_name}"
-                )
-                
-                # Save the plot
-                pdf(paste0("${gwas_name}_", celltype, "_", gene, "_regional_plot.pdf"), 
-                    width = 12, height = 9)
-                print(plot)
-                dev.off()
-            }, error = function(e) {
-                message("Error generating plot for gene ", gene, " in celltype ", celltype)
-                message(e)
-            })
-        }
+    # Load and process GWAS data
+    processed_gwas <- readRDS("${gwas_data}") 
+    if(grepl("chr", processed_gwas\$chr[1]) == FALSE) {
+      processed_gwas\$chr <- paste0("chr", processed_gwas\$chr)
     }
+    processed_gwas <- split(processed_gwas, processed_gwas\$signif_snp_region)
+    
+    # Load gene locations and find genes in each region
+    gene_locs <- fread("${gene_loc_file}")
+    
+    # Find genes in each region
+    genestokeep <- lapply(processed_gwas, get_genes_per_region, gene_locs = gene_locs)
+    
+    # Remove regions with no genes
+    regions_no_genes <- which(sapply(genestokeep, length) == 0)
+    if(length(regions_no_genes) > 0) {
+      cat(paste0("WARNING: ", length(regions_no_genes), " regions have no genes. Removing.\\n"))
+      processed_gwas <- processed_gwas[-regions_no_genes]
+      genestokeep <- genestokeep[-regions_no_genes]
+    }
+    
+    # Remove small regions
+    processed_gwas <- processed_gwas[sapply(processed_gwas, function(x) {
+      nrow(x) > min_snps
+    })]
+    
+    # Load eQTL data
+    eqtls <- readRDS("${eqtl_data}")
+    eqtl_list <- lapply(genestokeep, function(x) {
+      eqtls[eqtls\$gene %in% x, ]
+    })
+    
+    # Set output files
+    output_file <- paste0("coloc_results_", eqtl_name, ".txt")
+    summary_file <- paste0("coloc_summary_", eqtl_name, ".txt")
+    
+    # Run colocalization
+    coloc_results <- run_all_coloc(
+      processed_gwas = processed_gwas,
+      eqtl_list = eqtl_list,
+      trait_type = trait_type,
+      celltype = eqtl_name,
+      output_file = output_file
+    )
+    coloc_results\$GWAS=gwas_name
+    # Save results
+    write.table(coloc_results, file = output_file, sep = "\\t", row.names = FALSE, quote = FALSE)
+    
+
     """
 }
+
+process combine_coloc {
+    tag "Combining colocalization results"
+    label 'process_low'
+    
+    publishDir "${params.outdir}/coloc_results", mode: 'copy'
+    
+    input:
+    path coloc_files
+    val pp_threshold
+    
+    output:
+    path "coloc_results_combined.txt", emit: combined_results
+    
+    script:
+    """
+    #!/usr/bin/env Rscript
+    
+    # Load required libraries
+    library(data.table)
+    
+    # List all coloc result files
+    file_list <- strsplit("${coloc_files}", " ")[[1]]
+    
+    # Read and combine all files
+    all_results <- lapply(file_list, function(file) {
+      results <- fread(file)
+      return(results)
+    })
+    
+    # Combine into one data.frame
+    combined_results <- do.call(rbind, all_results)
+    
+    # Apply threshold filter
+    filtered_results <- combined_results[combined_results\$PP.H4 > ${pp_threshold}]
+    
+    # Sort by PP.H4
+    sorted_results <- filtered_results[order(-filtered_results\$PP.H4)]
+    
+    # Write to file
+    write.table(sorted_results, file = "coloc_results_combined.txt", 
+                sep = "\\t", row.names = FALSE, quote = FALSE)
+    """
+}
+
+
 

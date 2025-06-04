@@ -13,7 +13,8 @@ select_regions = function(
   gwas$pval <- gwas$P    # P-value
   gwas$pos <- gwas$BP    # Base pair position
   gwas$chr <- gwas$CHR   # Chromosome
-  
+
+  #now remove thes  
   # Step 1: Split GWAS data by chromosome
   message(paste0(Sys.time(), ": Splitting data by chromosome..."))
   gwas_by_chr <- split(gwas, gwas$CHR)
@@ -41,7 +42,7 @@ select_regions = function(
     gwas_by_chr,
     ieugwasr::ld_clump_local,
     clump_kb = kb_window,
-    clump_r2 = 0,
+    clump_r2 = 0.001,
     clump_p = pval,
     plink_bin = plink_bin,
     bfile = path_to_binaries
@@ -105,7 +106,9 @@ select_regions = function(
   
   message(paste0(Sys.time(), ": Found ", length(unique(result$signif_snp_region)), 
                  " independent regions with ", nrow(result), " total SNPs."))
-  
+
+  result=result %>% select(-SNP, -P, -BP, -CHR)
+
   return(result)
 }
 

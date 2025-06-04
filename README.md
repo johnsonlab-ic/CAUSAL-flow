@@ -15,7 +15,34 @@ This pipeline implements colocalization analysis using the `coloc` R package to 
 ## Usage
 
 ```bash
-nextflow run main.nf --gwas_file <path_to_gwas_file> --eqtl_file <path_to_eqtl_file>
+nextflow run main.nf \
+  --gwas_file <path/to/gwas_summary.txt> \
+  --gwas_name <name_of_gwas_study> \
+  --eqtl_data <path/to/eqtl_data.rds> \
+  --gene_location_file <path/to/gene_locations.csv> \
+  --outdir <output_directory>
+```
+
+### Input Files
+
+1. **GWAS Summary Statistics**:
+   - Must contain columns: SNP, CHR, BP, P, BETA, SE
+
+2. **eQTL Data**:
+   - RDS file containing eQTL data with columns: SNP, gene, beta, t.stat
+
+3. **Gene Location File**:
+   - CSV file containing gene coordinates with columns: gene_id, chr, start, end
+
+### Example Command
+
+```bash
+nextflow run main.nf \
+  --gwas_file /path/to/Epilepsy_GWAS.txt \
+  --gwas_name Epilepsy \
+  --eqtl_data /path/to/Brain_eQTL_data.rds \
+  --gene_location_file /path/to/gene_annotations_hg38.csv \
+  --outdir results/epilepsy_coloc
 ```
 
 ## Profiles
