@@ -21,6 +21,9 @@ process clump_gwas {
     library(tidyverse)
     library(data.table)
     library(ieugwasr)
+
+    tmp=list.files()
+    message(tmp)
     
     #load functions
     source("$source_R")
