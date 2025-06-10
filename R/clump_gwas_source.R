@@ -1,92 +1,12 @@
-# Function to find a working plink binary
-find_plink_binary <- function() {
-  # Check if plink is in the PATH
-  if (Sys.which("plink") != "") {
-    message("Found plink in PATH: ", Sys.which("plink"))
-    return(Sys.which("plink"))
-  }
-  
-  # Check common locations
-  common_locations <- c(
-    "/usr/bin/plink",
-    "/usr/local/bin/plink",
-    "/home/linuxbrew/.linuxbrew/bin/plink",
-    "/app/CAUSAL-flow/bin/plink"
-  )
-  
-  for (loc in common_locations) {
-    if (file.exists(loc)) {
-      message("Found plink at common location: ", loc)
-      return(loc)
-    }
-  }
-  
-  # Last resort: Try genetics.binaRies
-  tryCatch({
-    plink_bin <- genetics.binaRies::get_plink_binary()
-    message("Using plink from genetics.binaRies package: ", plink_bin)
-    # Check if the file actually exists before returning
-    if (file.exists(plink_bin)) {
-      return(plink_bin)
-    } else {
-      message("Warning: plink path from genetics.binaRies doesn't exist: ", plink_bin)
-    }
-  }, error = function(e) {
-    message("Error getting plink from genetics.binaRies: ", e$message)
-  })
-  
-  # If we get here, we couldn't find plink
-  stop("Could not find plink binary. Please make sure plink is installed and in your PATH.")
-}
-
-# Function to find reference data
-find_reference_path <- function(provided_path) {
-  # First check if the provided path exists
-  if (dir.exists(provided_path)) {
-    message("Using reference data from: ", provided_path)
-    return(provided_path)
-  }
-  
-  # Check common locations with EUR prefix files
-  common_locations <- c(
-    "/app/CAUSAL-flow/EUR",
-    "/app/COLOC-flow/EUR",
-    "/tmp/EUR",
-    "/scratch/EUR"
-  )
-  
-  for (loc in common_locations) {
-    if (dir.exists(loc)) {
-      # Check if there are .bed/.bim/.fam files
-      if (file.exists(paste0(loc, ".bed")) || 
-          length(list.files(loc, pattern = "\\.bed$")) > 0) {
-        message("Found reference data at: ", loc)
-        return(loc)
-      }
-    }
-  }
-  
-  # If we get here, we couldn't find reference data
-  stop("Could not find reference data. Please provide a valid path to the reference data.")
-}
-
 # Function to select genomic regions from GWAS data
 # Expects GWAS data with columns: SNP, CHR, BP, P, etc.
 select_regions = function(
   gwas,                # GWAS data frame with SNP, CHR, BP, P columns
   pval = 5e-8,         # P-value threshold for significant SNPs
   window = 1e6,        # Window size in base pairs
-  plink_bin = NULL,    # Path to plink binary
-  path_to_binaries = "/app/CAUSAL-flow/EUR"  # Path to reference data for clumping
+  plink_bin = genetics.binaRies::get_plink_binary(),
+  path_to_binaries = "/app/COLOC-flow/EUR"  # Path to reference data for clumping
 ) {
-  # Find plink binary if not provided
-  if (is.null(plink_bin)) {
-    plink_bin <- find_plink_binary()
-  }
-  
-  # Find reference data path
-  path_to_binaries <- find_reference_path(path_to_binaries)
-  
   # Prepare data for ieugwasr (which needs specific column names)
   message("Preparing data for analysis...")
   gwas$rsid <- gwas$SNP  # SNP ID
@@ -94,8 +14,7 @@ select_regions = function(
   gwas$pos <- gwas$BP    # Base pair position
   gwas$chr <- gwas$CHR   # Chromosome
 
-  message("Using plink binary at: ", plink_bin)
-  message("Using reference data at: ", path_to_binaries)
+  message(plink_bin)
   #now remove thes  
   # Step 1: Split GWAS data by chromosome
   message(paste0(Sys.time(), ": Splitting data by chromosome..."))
