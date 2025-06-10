@@ -23,6 +23,7 @@ process clump_gwas {
     library(ieugwasr)
 
     tmp=list.files()
+    tmp=getwd()
     message(tmp)
     
     #load functions
