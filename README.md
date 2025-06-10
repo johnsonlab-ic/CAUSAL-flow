@@ -1,4 +1,4 @@
-# COLOC-flow
+# CAUSAL-flow
 
 A Nextflow pipeline for colocalization analysis to identify shared genetic variants between GWAS and eQTL datasets.
 
