@@ -69,26 +69,14 @@ RUN R -e "devtools::install_github('MRCIEU/genetics.binaRies')"
 
 
 # Create working directory
-RUN mkdir -p /app/CAUSAL-flow
-
-# Make sure plink is properly installed and accessible
-RUN which plink && cp $(which plink) /usr/local/bin/plink && chmod +x /usr/local/bin/plink
-
-# Create directory for genetics.binaRies
-RUN mkdir -p /usr/local/lib/R/site-library/genetics.binaRies/bin && \
-    chmod -R 755 /usr/local/lib/R/site-library/genetics.binaRies
-
-# Copy plink to the expected location
-RUN cp /usr/local/bin/plink /usr/local/lib/R/site-library/genetics.binaRies/bin/ && \
-    chmod +x /usr/local/lib/R/site-library/genetics.binaRies/bin/plink
+RUN mkdir -p /app/COLOC-flow
 
 #get reference data 
 RUN wget http://fileserve.mrcieu.ac.uk/ld/1kg.v3.tgz \
-    && mkdir -p /app/CAUSAL-flow \
-    && tar -xzf 1kg.v3.tgz -C /app/CAUSAL-flow/ \
+    && tar -xzf 1kg.v3.tgz -C /app/COLOC-flow/ \
     && rm 1kg.v3.tgz
 
-WORKDIR /app/CAUSAL-flow
+WORKDIR /app/COLOC-flow
 
 # Set the default command
 # This allows overriding with "docker run -it coloc-flow:latest bash"

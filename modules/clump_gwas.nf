@@ -31,7 +31,7 @@ process clump_gwas {
     # Load example GWAS data
     gwas <- fread("$gwas_file")
 
-    
+    list.files("/app/COLOC-flow")
     # Define parameters
     pval <- as.numeric("$pvalue")        
     window <- as.numeric("$window_size")   
