@@ -12,7 +12,7 @@ process run_coloc {
     path gene_loc_file
     
     output:
-    path "coloc_results_${eqtl_name}.txt", emit: results_table
+    path "coloc_results_${eqtl_name}*${gwas_name}.txt", emit: results_table
 
         
     script:
@@ -67,8 +67,8 @@ process run_coloc {
     })
     
     # Set output files
-    output_file <- paste0("coloc_results_", eqtl_name, ".txt")
-    summary_file <- paste0("coloc_summary_", eqtl_name, ".txt")
+    output_file <- paste0("coloc_results_", eqtl_name, "_${gwas_name}.txt")
+    
     
     # Run colocalization
     coloc_results <- run_all_coloc(
@@ -112,6 +112,7 @@ process combine_coloc {
     # Read and combine all files
     all_results <- lapply(file_list, function(file) {
       results <- fread(file)
+      # Make sure GWAS column exists
       return(results)
     })
     
