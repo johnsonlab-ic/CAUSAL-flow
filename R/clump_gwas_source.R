@@ -14,6 +14,7 @@ select_regions = function(
   gwas$pos <- gwas$BP    # Base pair position
   gwas$chr <- gwas$CHR   # Chromosome
 
+  message("Plink binaries at ",plink_bin)
   #now remove thes  
   # Step 1: Split GWAS data by chromosome
   message(paste0(Sys.time(), ": Splitting data by chromosome..."))
