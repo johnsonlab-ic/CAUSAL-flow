@@ -2,10 +2,10 @@
 
 /*
 ========================================================================================
-    COLOC-flow
+    CAUSAL-flow
 ========================================================================================
     A Nextflow pipeline for colocalization analysis
-    Github: https://github.com/yourusername/COLOC-flow
+    Github: https://github.com/johnsonlab-ic/CAUSAL-flow
 ----------------------------------------------------------------------------------------
 */
 
@@ -27,7 +27,7 @@ include { run_coloc; combine_coloc } from './modules/run_coloc'
    parameters
 ========================================================================================
 */
-params.outdir="/var/lib/docker/alex_tmp/data/COLOC-flow_test/outs"
+params.outdir="/var/lib/docker/alex_tmp/data/CAUSAL-flow_test/outs"
 
 // GWAS parameters
 params.gwas_file="/home/ah3918/GWASi-flow/results/processed/Epilepsy_1_processedGRCh38.txt" // Single GWAS file
@@ -39,15 +39,15 @@ params.coloc_pph4_threshold=0.2 // Threshold for PP.H4 to filter coloc results
 params.gwas_name="Epilepsy_1"   // Only used if a single GWAS file is provided
 
 // eQTL parameters
-params.eqtl_dir="/var/lib/docker/alex_tmp/data/COLOC-flow_test/sc_eqtls/eQTL_outputs" // Directory containing eQTL files
+params.eqtl_dir="/var/lib/docker/alex_tmp/data/CAUSAL-flow_test/sc_eqtls/eQTL_outputs" // Directory containing eQTL files
 params.eqtl_file=null           // Single eQTL file (optional, takes precedence over dir)
 params.eqtl_pattern="*_cis_MatrixEQTLout.rds" // Pattern to match eQTL files
-params.gene_location_file="/var/lib/docker/alex_tmp/data/COLOC-flow_test/sc_eqtls/expression_matrices/gene_locations.csv"
+params.gene_location_file="/var/lib/docker/alex_tmp/data/CAUSAL-flow_test/sc_eqtls/expression_matrices/gene_locations.csv"
 
 
 // add log of input files 
 log.info """\
-         COLOC-flow - Colocalization Analysis Pipeline
+         CAUSAL-flow - Colocalization Analysis Pipeline
          ===================================
          GWAS file    : ${params.gwas_file}
          GWAS dir     : ${params.gwas_dir}

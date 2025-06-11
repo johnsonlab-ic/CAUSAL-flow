@@ -1,7 +1,7 @@
 FROM rocker/tidyverse:latest
 
-LABEL maintainer="Your Name <your.email@example.com>"
-LABEL description="Docker image for COLOC-flow pipeline"
+LABEL maintainer="Johnson Lab <your.email@example.com>"
+LABEL description="Docker image for CAUSAL-flow pipeline"
 
 # Install system dependencies required for R packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -69,15 +69,15 @@ RUN R -e "devtools::install_github('MRCIEU/genetics.binaRies')"
 
 
 # Create working directory
-RUN mkdir -p /app/COLOC-flow
+RUN mkdir -p /app/CAUSAL-flow
 
 #get reference data 
 RUN wget http://fileserve.mrcieu.ac.uk/ld/1kg.v3.tgz \
-    && tar -xzf 1kg.v3.tgz -C /app/COLOC-flow/ \
+    && tar -xzf 1kg.v3.tgz -C /app/CAUSAL-flow/ \
     && rm 1kg.v3.tgz
 
-WORKDIR /app/COLOC-flow
+WORKDIR /app/CAUSAL-flow
 
 # Set the default command
-# This allows overriding with "docker run -it coloc-flow:latest bash"
+# This allows overriding with "docker run -it causal-flow:latest bash"
 CMD ["Rscript", "--help"]
