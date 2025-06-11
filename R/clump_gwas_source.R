@@ -4,7 +4,7 @@ select_regions = function(
   gwas,                # GWAS data frame with SNP, CHR, BP, P columns
   pval = 5e-8,         # P-value threshold for significant SNPs
   window = 1e6,        # Window size in base pairs
-  plink_bin = genetics.binaRies::get_plink_binary(),
+  plink_bin = NULL,    # Will be determined if NULL
   path_to_binaries = "/app/COLOC-flow/EUR"  # Path to reference data for clumping
 ) {
   # Prepare data for ieugwasr (which needs specific column names)
