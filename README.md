@@ -25,15 +25,10 @@ nextflow run johnsonlab-ic/CAUSAL-flow \
   --outdir <output_directory>
 ```
 
-Or if you've cloned the repository:
+To ensure you always run the latest version, before each run use;
 
 ```bash
-nextflow run main.nf \
-  --gwas_file <path/to/gwas_summary.txt> \
-  --gwas_name <name_of_gwas_study> \
-  --eqtl_file <path/to/eqtl_data.rds> \
-  --gene_location_file <path/to/gene_locations.csv> \
-  --outdir <output_directory>
+nextflow drop johnsonlab-ic/CAUSAL-flow
 ```
 
 ### Input Files
