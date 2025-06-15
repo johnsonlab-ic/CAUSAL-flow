@@ -138,41 +138,37 @@ workflow{
     if (params.allele_file) {
         log.info "Running Mendelian Randomization analysis..."
         
-        // Step 5: Extract information from coloc results filenames
-        coloc_info_ch = coloc_results_ch.results_table.map { file -> 
-            def parts = file.name.toString().split('_')
-            def eqtl_name = parts[2]
-            def gwas_name = parts[3].replaceFirst(/\.txt$/, '')
-            return tuple(eqtl_name, gwas_name, file)
-        }
-        
-        // Create a channel with eQTL and GWAS data, keyed by their names
-        gwas_by_name_ch = gwas_data_ch.map { file, name -> tuple(name, file) }
-        eqtl_by_name_ch = eqtl_ch.map { file, name -> tuple(name, file) }
-        
-        // Join channels to get all inputs for MR process
-        mr_inputs_ch = coloc_info_ch
-            .map { eqtl_name, gwas_name, coloc_file -> 
-                tuple(gwas_name, eqtl_name, coloc_file)
+        // Step 5: Connect original inputs with their corresponding coloc results
+        // This creates a GWAS-eQTL-coloc triplet for each analysis
+        coloc_results_ch.results_table
+            .map { file ->
+                def parts = file.name.toString().split('_')
+                def eqtl_name = parts[2]
+                def gwas_name = parts[3].replaceFirst(/\.txt$/, '')
+                return tuple(gwas_name, eqtl_name, file)
             }
-            .join(gwas_by_name_ch, by: 0)
-            .map { gwas_name, eqtl_name, coloc_file, gwas_file ->
-                tuple(eqtl_name, gwas_name, coloc_file, gwas_file)
-            }
-            .join(eqtl_by_name_ch, by: 0)
-            .map { eqtl_name, gwas_name, coloc_file, gwas_file, eqtl_file ->
-                tuple(gwas_file, gwas_name, tuple(eqtl_file, eqtl_name), coloc_file)
-            }
+            .set { coloc_files_ch }
         
-        // Step 6: Run MR analysis for each combination using coloc results to filter genes
+        // Combine original inputs with coloc results based on GWAS and eQTL names
+        coloc_inputs_ch
+            .map { gwas_file, gwas_name, eqtl_file, eqtl_name ->
+                tuple(gwas_name, eqtl_name, gwas_file, eqtl_file)
+            }
+            .combine(coloc_files_ch, by: [0, 1])
+            .map { gwas_name, eqtl_name, gwas_file, eqtl_file, coloc_file ->
+                tuple(gwas_file, gwas_name, eqtl_file, eqtl_name, coloc_file)
+            }
+            .set { mr_triplet_ch }
+        
+        // Step 6: Run MR with properly paired inputs and coloc results
         mr_results_ch = run_MR(
             "${baseDir}/R/run_MR_functions.R",
-            mr_inputs_ch.map{it[0]},  // gwas_data
-            mr_inputs_ch.map{it[1]},  // gwas_name
-            mr_inputs_ch.map{it[2]},  // eqtl tuple
+            mr_triplet_ch.map{it[0]},  // gwas_data
+            mr_triplet_ch.map{it[1]},  // gwas_name
+            mr_triplet_ch.map{tuple(it[2], it[3])},  // eqtl tuple
             params.eqtl_fdr_threshold,
             file(params.allele_file),
-            mr_inputs_ch.map{it[3]}   // coloc results file
+            mr_triplet_ch.map{it[4]}   // matched coloc results file
         )
         
         // Step 7: Combine all MR results

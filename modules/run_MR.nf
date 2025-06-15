@@ -27,7 +27,16 @@ process run_MR {
     library(data.table)
     library(MendelianRandomization)
     library(dplyr)
-
+    
+    # Check if this coloc file matches the current GWAS and eQTL
+    coloc_filename <- basename("${coloc_results}")
+    expected_pattern <- paste0("coloc_results_${eqtl_name}_${gwas_name}")
+    
+    if (!grepl(expected_pattern, coloc_filename)) {
+        cat("This coloc file does not match the current GWAS and eQTL combination. Skipping.\\n")
+        quit("no", status = 0)
+    }
+    
     #read in data
     gwas_data <- readRDS("${gwas_data}")
     eqtl_data <- readRDS("${eqtl_data}")
