@@ -11,6 +11,7 @@ process run_MR {
     tuple path(eqtl_data), val(eqtl_name)
     val fdr_threshold
     path alleles
+    path coloc_results
     
     output:
     path "mr_results_${eqtl_name}_${gwas_name}.txt", emit: results_table
@@ -31,14 +32,35 @@ process run_MR {
     gwas_data <- readRDS("${gwas_data}")
     eqtl_data <- readRDS("${eqtl_data}")
     allele_df <- data.table::fread("${alleles}")
-
-    # Filter genes - keep only the most significant SNP per gene
-    significant_eqtls <- eqtl_data %>% 
-        filter(FDR < ${fdr_threshold}) %>%
-        group_by(gene) %>% 
-        arrange(FDR) %>% 
-        slice(1) %>% 
+    
+    # Read coloc results and filter for high-confidence colocalization (PP.H4 > 0.8)
+    coloc_df <- data.table::fread("${coloc_results}")
+    coloc_genes <- coloc_df[coloc_df\$PP.H4 > 0.8,]\$gene
+    
+    cat(paste0("Found ", length(coloc_genes), " genes with PP.H4 > 0.8 from colocalization results\\n"))
+    
+    if (length(coloc_genes) == 0) {
+        cat("No genes with PP.H4 > 0.8 found. Aborting MR analysis.\\n")
+        # Write empty file and exit
+        file.create("mr_results_${eqtl_name}_${gwas_name}.txt")
+        quit("no", 0)
+    }
+    
+    # Filter eQTL data for coloc genes with significant eQTLs and keep the most significant SNP per gene
+    significant_eqtls <- eqtl_data %>%
+        filter(gene %in% coloc_genes & FDR < ${fdr_threshold}) %>%
+        group_by(gene) %>%
+        arrange(FDR) %>%
+        slice(1) %>%
         ungroup()
+        
+    if (nrow(significant_eqtls) == 0) {
+        cat("No genes passed both coloc (PP.H4 > 0.8) and eQTL significance (FDR < ${fdr_threshold}) filters. Aborting.\\n")
+        file.create("mr_results_${eqtl_name}_${gwas_name}.txt")
+        quit("no", 0)
+    }
+    
+    cat(paste0("Running MR on ", nrow(significant_eqtls), " genes that passed both coloc and eQTL filters\\n"))
     
     # Print summary of filtered data
     cat(paste0("Found ", nrow(significant_eqtls), " genes with significant eQTLs (FDR < ${fdr_threshold})\\n"))
@@ -79,6 +101,7 @@ process run_MR {
     if (length(results_list) > 0) {
         all_results <- bind_rows(results_list)
         all_results\$gwas_name <- "${gwas_name}"
+        all_results\$coloc_status <- "PP.H4_0.8+"
         
         # Write results to file
         write.table(all_results, file = output_file, 
@@ -87,9 +110,8 @@ process run_MR {
         cat(paste0("MR results saved to ", output_file, "\\n"))
     } else {
         # Write empty results file if no results
-        cat("No significant MR results found.\\n")
-        write.table(data.frame(), file = output_file,
-                    sep = "\\t", row.names = FALSE, quote = FALSE)
+        cat("No MR results could be calculated.\\n")
+        file.create(output_file)
     }
     """
 }

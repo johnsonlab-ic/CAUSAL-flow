@@ -129,7 +129,7 @@ workflow{
     )
     
     // Step 4: Combine all colocalization results and filter by PP.H4 threshold
-    combine_coloc(
+    combine_coloc_ch = combine_coloc(
         coloc_results_ch.results_table.collect(),
         params.coloc_pph4_threshold
     )
@@ -138,17 +138,41 @@ workflow{
     if (params.allele_file) {
         log.info "Running Mendelian Randomization analysis..."
         
-        // Step 5: Create MR inputs from GWAS and eQTL data
-        mr_inputs_ch = gwas_data_ch.combine(eqtl_ch)
+        // Step 5: Extract information from coloc results filenames
+        coloc_info_ch = coloc_results_ch.results_table.map { file -> 
+            def parts = file.name.toString().split('_')
+            def eqtl_name = parts[2]
+            def gwas_name = parts[3].replaceFirst(/\.txt$/, '')
+            return tuple(eqtl_name, gwas_name, file)
+        }
         
-        // Step 6: Run MR analysis for each combination
+        // Create a channel with eQTL and GWAS data, keyed by their names
+        gwas_by_name_ch = gwas_data_ch.map { file, name -> tuple(name, file) }
+        eqtl_by_name_ch = eqtl_ch.map { file, name -> tuple(name, file) }
+        
+        // Join channels to get all inputs for MR process
+        mr_inputs_ch = coloc_info_ch
+            .map { eqtl_name, gwas_name, coloc_file -> 
+                tuple(gwas_name, eqtl_name, coloc_file)
+            }
+            .join(gwas_by_name_ch, by: 0)
+            .map { gwas_name, eqtl_name, coloc_file, gwas_file ->
+                tuple(eqtl_name, gwas_name, coloc_file, gwas_file)
+            }
+            .join(eqtl_by_name_ch, by: 0)
+            .map { eqtl_name, gwas_name, coloc_file, gwas_file, eqtl_file ->
+                tuple(gwas_file, gwas_name, tuple(eqtl_file, eqtl_name), coloc_file)
+            }
+        
+        // Step 6: Run MR analysis for each combination using coloc results to filter genes
         mr_results_ch = run_MR(
             "${baseDir}/R/run_MR_functions.R",
             mr_inputs_ch.map{it[0]},  // gwas_data
             mr_inputs_ch.map{it[1]},  // gwas_name
-            mr_inputs_ch.map{tuple(it[2], it[3])},  // eqtl tuple
+            mr_inputs_ch.map{it[2]},  // eqtl tuple
             params.eqtl_fdr_threshold,
-            file(params.allele_file)
+            file(params.allele_file),
+            mr_inputs_ch.map{it[3]}   // coloc results file
         )
         
         // Step 7: Combine all MR results
