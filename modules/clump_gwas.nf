@@ -41,7 +41,7 @@ process clump_gwas {
         gwas = gwas,
         pval = pval,
         window = window,
-        plink_bin = genetics.binaRies::get_plink_binary(),
+        plink_bin = "/usr/local/bin/plink",
         path_to_binaries = "/app/CAUSAL-flow/EUR"
     )
     

@@ -20,10 +20,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgsl-dev \
     libsodium-dev \
     libgit2-dev \
-    plink \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# Install plink directly
+RUN wget https://s3.amazonaws.com/plink1-assets/plink_linux_x86_64_20241022.zip \
+    && unzip plink_linux_x86_64_20241022.zip -d /usr/local/bin/ \
+    && rm plink_linux_x86_64_20241022.zip \
+    && chmod +x /usr/local/bin/plink
 
 # Install BiocManager
 RUN R -e "install.packages('BiocManager', repos='https://cran.r-project.org/')"
