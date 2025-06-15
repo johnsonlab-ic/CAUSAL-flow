@@ -12,7 +12,8 @@ process run_coloc {
     path gene_loc_file
     
     output:
-    path "coloc_results_${eqtl_name}*${gwas_name}.txt", emit: results_table
+    path "coloc_results_${eqtl_name}_${gwas_name}.txt", emit: results_table
+    tuple path(gwas_data), val(gwas_name), path(eqtl_data), val(eqtl_name), path("coloc_results_${eqtl_name}_${gwas_name}.txt"), emit: coloc_complete
 
         
     script:

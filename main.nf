@@ -138,37 +138,15 @@ workflow{
     if (params.allele_file) {
         log.info "Running Mendelian Randomization analysis..."
         
-        // Step 5: Connect original inputs with their corresponding coloc results
-        // This creates a GWAS-eQTL-coloc triplet for each analysis
-        coloc_results_ch.results_table
-            .map { file ->
-                def parts = file.name.toString().split('_')
-                def eqtl_name = parts[2]
-                def gwas_name = parts[3].replaceFirst(/\.txt$/, '')
-                return tuple(gwas_name, eqtl_name, file)
-            }
-            .set { coloc_files_ch }
-        
-        // Combine original inputs with coloc results based on GWAS and eQTL names
-        coloc_inputs_ch
-            .map { gwas_file, gwas_name, eqtl_file, eqtl_name ->
-                tuple(gwas_name, eqtl_name, gwas_file, eqtl_file)
-            }
-            .combine(coloc_files_ch, by: [0, 1])
-            .map { gwas_name, eqtl_name, gwas_file, eqtl_file, coloc_file ->
-                tuple(gwas_file, gwas_name, eqtl_file, eqtl_name, coloc_file)
-            }
-            .set { mr_triplet_ch }
-        
-        // Step 6: Run MR with properly paired inputs and coloc results
+        // Step 5: Run MR directly using the coloc_complete channel which contains all necessary data
         mr_results_ch = run_MR(
             "${baseDir}/R/run_MR_functions.R",
-            mr_triplet_ch.map{it[0]},  // gwas_data
-            mr_triplet_ch.map{it[1]},  // gwas_name
-            mr_triplet_ch.map{tuple(it[2], it[3])},  // eqtl tuple
+            coloc_results_ch.coloc_complete.map{it[0]},  // gwas_data
+            coloc_results_ch.coloc_complete.map{it[1]},  // gwas_name
+            coloc_results_ch.coloc_complete.map{tuple(it[2], it[3])},  // eqtl tuple
             params.eqtl_fdr_threshold,
             file(params.allele_file),
-            mr_triplet_ch.map{it[4]}   // matched coloc results file
+            coloc_results_ch.coloc_complete.map{it[4]}   // coloc results file
         )
         
         // Step 7: Combine all MR results
