@@ -22,12 +22,19 @@ process clump_gwas {
     library(data.table)
     library(ieugwasr)
 
+    assign("tempdir", function() {
+    # Create a local temp directory
     work_dir <- getwd()
     temp_dir <- file.path(work_dir, "tmp_dir")
-    dir.create(temp_dir, showWarnings = FALSE, recursive = TRUE)
-    Sys.setenv(TMPDIR = temp_dir)
-    Sys.setenv(TMP = temp_dir)
-    Sys.setenv(TEMP = temp_dir)
+    
+    # Create the directory if it doesn't exist
+    if (!dir.exists(temp_dir)) {
+        dir.create(temp_dir, showWarnings = FALSE, recursive = TRUE)
+    }
+    
+    return(temp_dir)
+    }, envir = baseenv())
+
     
     #load functions
     source("$source_R")
