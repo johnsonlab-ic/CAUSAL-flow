@@ -19,6 +19,7 @@ nextflow.enable.dsl = 2
 
 include { clump_gwas } from './modules/clump_gwas'
 include { run_coloc; combine_coloc } from './modules/run_coloc'
+include { run_MR; combine_MR } from './modules/run_MR'
 // include { PLOT_RESULTS } from './modules/plot_results'
 // include { GENERATE_REPORT } from './modules/generate_report'
 
@@ -43,17 +44,24 @@ params.eqtl_dir="/var/lib/docker/alex_tmp/data/CAUSAL-flow_test/sc_eqtls/eQTL_ou
 params.eqtl_file=null           // Single eQTL file (optional, takes precedence over dir)
 params.eqtl_pattern="*_cis_MatrixEQTLout.rds" // Pattern to match eQTL files
 params.gene_location_file="/var/lib/docker/alex_tmp/data/CAUSAL-flow_test/sc_eqtls/expression_matrices/gene_locations.csv"
+params.allele_file=null// File with allele information
 
+//MR parameters
+params.eqtl_fdr_threshold=0.05 // FDR threshold for eQTLs 
+params.mr_pval_threshold=0.05 // P-value threshold for filtering MR results
 
 // add log of input files 
 log.info """\
-         CAUSAL-flow - Colocalization Analysis Pipeline
+         CAUSAL-flow - Colocalization and Mendelian Randomization Pipeline
          ===================================
          GWAS file    : ${params.gwas_file}
          GWAS dir     : ${params.gwas_dir}
          eQTL file    : ${params.eqtl_file}
          eQTL dir     : ${params.eqtl_dir}
          Output dir   : ${params.outdir}
+         eQTL FDR threshold: ${params.eqtl_fdr_threshold}
+         MR p-value threshold: ${params.mr_pval_threshold}
+         Allele file  : ${params.allele_file}
          """
          .stripIndent()
 
@@ -125,4 +133,30 @@ workflow{
         coloc_results_ch.results_table.collect(),
         params.coloc_pph4_threshold
     )
+    
+    // Check if allele file is provided for MR analysis
+    if (params.allele_file) {
+        log.info "Running Mendelian Randomization analysis..."
+        
+        // Step 5: Create MR inputs from GWAS and eQTL data
+        mr_inputs_ch = gwas_data_ch.combine(eqtl_ch)
+        
+        // Step 6: Run MR analysis for each combination
+        mr_results_ch = run_MR(
+            "${baseDir}/R/run_MR_functions.R",
+            mr_inputs_ch.map{it[0]},  // gwas_data
+            mr_inputs_ch.map{it[1]},  // gwas_name
+            mr_inputs_ch.map{tuple(it[2], it[3])},  // eqtl tuple
+            params.eqtl_fdr_threshold,
+            file(params.allele_file)
+        )
+        
+        // Step 7: Combine all MR results
+        combine_MR(
+            mr_results_ch.results_table.collect(),
+            params.mr_pval_threshold  // P-value threshold for MR results
+        )
+    } else {
+        log.info "Skipping MR analysis as allele file is not provided. Set params.allele_file to run MR."
+    }
 }
