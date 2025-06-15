@@ -40,7 +40,7 @@ path_to_binaries){
     
     # Join with allele information
     eqtl_data=eqtl_data %>% left_join(allele_df, by=c("SNP"="snp")) 
-    if(!"ref_allele" %in% colnames(eqtl_data) || !"alt_allele" %in% colnames(eqtl_data)) {
+    if(!"ref" %in% colnames(eqtl_data) || !"alt" %in% colnames(eqtl_data)) {
         # If columns don't exist, try alternate names
         if(!"effect_allele" %in% colnames(allele_df) || !"other_allele" %in% colnames(allele_df)) {
             message(paste0(Sys.time(),": Required allele columns not found in allele_df"))
@@ -50,7 +50,7 @@ path_to_binaries){
             rename(eqtl_effect_allele=effect_allele, eqtl_other_allele=other_allele)
     } else {
         eqtl_data = eqtl_data %>% 
-            rename(eqtl_effect_allele=ref_allele, eqtl_other_allele=alt_allele)
+            rename(eqtl_effect_allele=ref, eqtl_other_allele=alt)
     }
     
     # Filter GWAS data for the lead SNP

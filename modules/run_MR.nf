@@ -1,6 +1,6 @@
 process run_MR {
     tag "Running MR analysis for ${eqtl_name} and ${gwas_name}"
-    label 'process_medium'
+    label 'process_high'
     
     publishDir "${params.outdir}/mr_results", mode: 'copy'
     

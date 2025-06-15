@@ -71,7 +71,7 @@ RUN R -e "BiocManager::install(c( \
 # Install genetics.binaRies which is used in the cellCOLOC source
 RUN R -e "devtools::install_github('MRCIEU/genetics.binaRies')"
 
-
+RUN R -e "install.packages('MendelianRandomization')"
 # Create working directory
 RUN mkdir -p /app/CAUSAL-flow
 
