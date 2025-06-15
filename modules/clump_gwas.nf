@@ -31,7 +31,8 @@ process clump_gwas {
     list.files("/app/CAUSAL-flow")
     # Define parameters
     pval <- as.numeric("$pvalue")        
-    window <- as.numeric("$window_size")   
+    window <- as.numeric("$window_size")
+
     
     # Run region selection
     regions <- select_regions(

@@ -261,7 +261,7 @@ run_all_coloc <- function(processed_gwas, eqtl_list, trait_type, celltype, outpu
     numeric_cols <- c("SNP.PP.H4", "eQTL_pval", "eQTL_FDR", "GWAS_pval", 
                      "nsnps", "PP.H0", "PP.H1", "PP.H2", "PP.H3", "PP.H4")
     final_results[numeric_cols] <- lapply(final_results[numeric_cols], function(x) {
-      if(is.numeric(x)) round(x, 6) else x
+      if(is.numeric(x)) signif(x, 6) else x
     })
     
     # Sort by PP.H4 (posterior probability of colocalization)
