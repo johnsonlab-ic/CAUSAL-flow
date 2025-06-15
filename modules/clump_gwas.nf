@@ -22,9 +22,12 @@ process clump_gwas {
     library(data.table)
     library(ieugwasr)
 
-    tmp=list.files()
-    tmp=getwd()
-    message(tmp)
+    work_dir <- getwd()
+    temp_dir <- file.path(work_dir, "tmp_dir")
+    dir.create(temp_dir, showWarnings = FALSE, recursive = TRUE)
+    Sys.setenv(TMPDIR = temp_dir)
+    Sys.setenv(TMP = temp_dir)
+    Sys.setenv(TEMP = temp_dir)
     
     #load functions
     source("$source_R")
