@@ -22,24 +22,7 @@ process clump_gwas {
     library(data.table)
     library(ieugwasr)
 
-    custom_tempfile <- function(pattern = "file", tmpdir = NULL, fileext = "") {
-    if (is.null(tmpdir)) {
-        # Create a local temp directory
-        work_dir <- getwd()
-        tmpdir <- file.path(work_dir, "tmp_dir")
-        
-        # Create the directory if it doesn't exist
-        if (!dir.exists(tmpdir)) {
-        dir.create(tmpdir, showWarnings = FALSE, recursive = TRUE)
-        }
-    }
-    
-    # Generate a random filename in our custom directory
-    filename <- paste0(pattern, "_", format(Sys.time(), "%Y%m%d_%H%M%S"), "_", 
-                        sample(1000:9999, 1), fileext)
-    file.path(tmpdir, filename)
-    }
-    
+
     #load functions
     source("$source_R")
     # Load example GWAS data

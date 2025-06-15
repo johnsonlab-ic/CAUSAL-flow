@@ -1,5 +1,63 @@
 # Function to select genomic regions from GWAS data
 # Expects GWAS data with columns: SNP, CHR, BP, P, etc.
+
+new_ld_clump_local <- function(dat, clump_kb, clump_r2, clump_p, bfile, plink_bin)
+{
+    # Create a local temp directory
+    work_dir <- getwd()
+    temp_dir <- file.path(work_dir, "tmp_dir")
+    
+    # Create the directory if it doesn't exist
+    if (!dir.exists(temp_dir)) {
+        dir.create(temp_dir, showWarnings = FALSE, recursive = TRUE)
+    }
+    
+    # Make textfile in our custom temp directory
+    shell <- ifelse(Sys.info()['sysname'] == "Windows", "cmd", "sh")
+    random_name <- paste0("clump_", format(Sys.time(), "%Y%m%d_%H%M%S"), "_", sample(1000:9999, 1))
+    fn <- file.path(temp_dir, random_name)
+    
+    # Write the data
+    write.table(data.frame(SNP=dat[["rsid"]], P=dat[["pval"]]), 
+                file=fn, row.names=FALSE, col.names=TRUE, quote=FALSE)
+    
+    # Build and run the plink command
+    fun2 <- paste0(
+        shQuote(plink_bin, type=shell),
+        " --bfile ", shQuote(bfile, type=shell),
+        " --clump ", shQuote(fn, type=shell), 
+        " --clump-p1 ", clump_p, 
+        " --clump-r2 ", clump_r2, 
+        " --clump-kb ", clump_kb, 
+        " --out ", shQuote(fn, type=shell)
+    )
+    system(fun2)
+    
+    # Read results and clean up
+    clumped_file <- paste(fn, ".clumped", sep="")
+    if (file.exists(clumped_file)) {
+        res <- tryCatch({
+            read.table(clumped_file, header=TRUE)
+        }, error = function(e) {
+            message("Warning: Could not read clumped file: ", e$message)
+            return(data.frame(SNP=character(0)))
+        })
+    } else {
+        message("Warning: Clumped file was not created. Check if plink command ran successfully.")
+        return(dat[0,]) # Return empty dataframe with same structure
+    }
+    
+    # Clean up temporary files
+    unlink(paste(fn, "*", sep=""))
+    
+    # Filter results
+    y <- subset(dat, !dat[["rsid"]] %in% res[["SNP"]])
+    if(nrow(y) > 0) {
+        message("Removing ", length(y[["rsid"]]), " of ", nrow(dat), " variants due to LD with other variants or absence from LD reference panel")
+    }
+    
+    return(subset(dat, dat[["rsid"]] %in% res[["SNP"]]))
+}
 select_regions = function(
   gwas,                # GWAS data frame with SNP, CHR, BP, P columns
   pval = 5e-8,         # P-value threshold for significant SNPs
@@ -41,7 +99,7 @@ select_regions = function(
   # Always use local clumping with reference data from the container
   clumped_snps <- suppressMessages(lapply(
     gwas_by_chr,
-    ieugwasr::ld_clump_local,
+    new_ld_clump_local,
     clump_kb = kb_window,
     clump_r2 = 0.001,
     clump_p = pval,
