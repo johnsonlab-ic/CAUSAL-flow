@@ -2,7 +2,7 @@ process run_coloc {
     tag "Running colocalization analysis for ${eqtl_name} and ${gwas_name}"
     label 'process_high'
     
-    publishDir "${params.outdir}/coloc_results", mode: 'copy'
+    publishDir "${params.outdir}/coloc_results", mode: 'copy', pattern: "coloc_results_*.txt"
     
     input:
     path source_R
