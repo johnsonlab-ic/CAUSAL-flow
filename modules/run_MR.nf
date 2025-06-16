@@ -35,7 +35,10 @@ process run_MR {
     
     # Read coloc results and filter for high-confidence colocalization (PP.H4 > 0.8)
     coloc_df <- data.table::fread("${coloc_results}")
-    coloc_genes <- coloc_df[coloc_df\$PP.H4 > 0.8,]\$gene
+    
+    # Extract genes and their lead SNPs from coloc results
+    filtered_coloc <- coloc_df[coloc_df\$PP.H4 > 0.8, c("gene", "lead_snp")]
+    coloc_genes <- filtered_coloc\$gene
     
     cat(paste0("Found ", length(coloc_genes), " genes with PP.H4 > 0.8 from colocalization results\\n"))
     
@@ -46,13 +49,14 @@ process run_MR {
         quit("no", 0)
     }
     
-    # Filter eQTL data for coloc genes with significant eQTLs and keep the most significant SNP per gene
-    significant_eqtls <- eqtl_data %>%
+    # Check which genes from coloc results have significant eQTLs
+    significant_genes <- eqtl_data %>%
         filter(gene %in% coloc_genes & FDR < ${fdr_threshold}) %>%
-        group_by(gene) %>%
-        arrange(FDR) %>%
-        slice(1) %>%
-        ungroup()
+        pull(gene) %>%
+        unique()
+        
+    # Create a data frame with gene and lead_snp for significant genes
+    significant_eqtls <- filtered_coloc[filtered_coloc\$gene %in% significant_genes,]
         
     if (nrow(significant_eqtls) == 0) {
         cat("No genes passed both coloc (PP.H4 > 0.8) and eQTL significance (FDR < ${fdr_threshold}) filters. Aborting.\\n")
@@ -75,9 +79,9 @@ process run_MR {
     cat("Running MR analysis for each gene:\\n")
     for (i in 1:nrow(significant_eqtls)) {
         gene <- significant_eqtls\$gene[i]
-        lead_snp <- significant_eqtls\$SNP[i]
+        lead_snp <- significant_eqtls\$lead_snp[i]
         
-        cat(paste0("  Processing gene ", i, "/", nrow(significant_eqtls), ": ", gene, " (SNP: ", lead_snp, ")\\n"))
+        cat(paste0("  Processing gene ", i, "/", nrow(significant_eqtls), ": ", gene, " (Coloc Lead SNP: ", lead_snp, ")\\n"))
         
         mr_result <- run_MR_single(
             gwas_data = gwas_data,
