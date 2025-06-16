@@ -121,7 +121,7 @@ process combine_coloc {
     combined_results <- do.call(rbind, all_results)
     
     # Apply threshold filter
-    filtered_results <- combined_results[combined_results\$PP.H4 > ${pp_threshold}]
+    filtered_results <- combined_results
     
     # Sort by PP.H4
     sorted_results <- filtered_results[order(-filtered_results\$PP.H4)]
