@@ -35,24 +35,24 @@ process run_MR {
     
     # Read coloc results and filter for high-confidence colocalization (PP.H4 > 0.8)
     coloc_df <- data.table::fread("${coloc_results}")
-    coloc_genes <- coloc_df[coloc_df\$PP.H4 > 0.8,]\$gene
+    # Extract both genes and their lead SNPs from coloc results
+    high_coloc_results <- coloc_df[coloc_df\$PP.H4 > 0.8, c("gene", "lead_snp")]
     
-    cat(paste0("Found ", length(coloc_genes), " genes with PP.H4 > 0.8 from colocalization results\\n"))
+    cat(paste0("Found ", nrow(high_coloc_results), " genes with PP.H4 > 0.8 from colocalization results\\n"))
     
-    if (length(coloc_genes) == 0) {
+    if (nrow(high_coloc_results) == 0) {
         cat("No genes with PP.H4 > 0.8 found. Aborting MR analysis.\\n")
         # Write empty file and exit
         file.create("mr_results_${eqtl_name}_${gwas_name}.txt")
         quit("no", 0)
     }
     
-    # Filter eQTL data for coloc genes with significant eQTLs and keep the most significant SNP per gene
+    # Get list of coloc genes
+    coloc_genes <- high_coloc_results\$gene
+    
+    # Filter eQTL data for coloc genes with significant eQTLs
     significant_eqtls <- eqtl_data %>%
-        filter(gene %in% coloc_genes & FDR < ${fdr_threshold}) %>%
-        group_by(gene) %>%
-        arrange(FDR) %>%
-        slice(1) %>%
-        ungroup()
+        filter(gene %in% coloc_genes & FDR < ${fdr_threshold})
         
     if (nrow(significant_eqtls) == 0) {
         cat("No genes passed both coloc (PP.H4 > 0.8) and eQTL significance (FDR < ${fdr_threshold}) filters. Aborting.\\n")
@@ -73,12 +73,20 @@ process run_MR {
     
     # Loop through each gene
     cat("Running MR analysis for each gene:\\n")
-    for (i in 1:nrow(significant_eqtls)) {
-        gene <- significant_eqtls\$gene[i]
-        lead_snp <- significant_eqtls\$SNP[i]
+    # Get unique genes for processing
+    unique_genes <- unique(significant_eqtls$gene)
+    
+    for (i in 1:length(unique_genes)) {
+        gene <- unique_genes[i]
+        # Get the lead SNP from coloc results
+        lead_snp <- high_coloc_results[high_coloc_results$gene == gene, "lead_snp"][1]
         
-        cat(paste0("  Processing gene ", i, "/", nrow(significant_eqtls), ": ", gene, " (SNP: ", lead_snp, ")\\n"))
-        cat("GWAS data column names:", paste(colnames(gwas_data), collapse=", "), "\n")
+        if (is.null(lead_snp) || is.na(lead_snp) || lead_snp == "") {
+            cat(paste0("  Skipping gene ", gene, " - no lead SNP found in coloc results\\n"))
+            next
+        }
+        
+        cat(paste0("  Processing gene ", i, "/", length(unique_genes), ": ", gene, " (Coloc Lead SNP: ", lead_snp, ")\\n"))
         mr_result <- run_MR_single(
             gwas_data = gwas_data,
             eqtl_data = eqtl_data,
