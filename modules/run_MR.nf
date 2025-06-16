@@ -78,7 +78,7 @@ process run_MR {
         lead_snp <- significant_eqtls\$SNP[i]
         
         cat(paste0("  Processing gene ", i, "/", nrow(significant_eqtls), ": ", gene, " (SNP: ", lead_snp, ")\\n"))
-        
+        cat("GWAS data column names:", paste(colnames(gwas_data), collapse=", "), "\n")
         mr_result <- run_MR_single(
             gwas_data = gwas_data,
             eqtl_data = eqtl_data,
