@@ -74,12 +74,12 @@ process run_MR {
     # Loop through each gene
     cat("Running MR analysis for each gene:\\n")
     # Get unique genes for processing
-    unique_genes <- unique(significant_eqtls$gene)
+    unique_genes <- unique(significant_eqtls\$gene)
     
     for (i in 1:length(unique_genes)) {
         gene <- unique_genes[i]
         # Get the lead SNP from coloc results
-        lead_snp <- high_coloc_results[high_coloc_results$gene == gene, "lead_snp"][1]
+        lead_snp <- high_coloc_results[high_coloc_results\$gene == gene, "lead_snp"][1]
         
         if (is.null(lead_snp) || is.na(lead_snp) || lead_snp == "") {
             cat(paste0("  Skipping gene ", gene, " - no lead SNP found in coloc results\\n"))
