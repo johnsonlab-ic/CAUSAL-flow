@@ -40,47 +40,29 @@ path_to_binaries){
     
     # Join with allele information
     eqtl_data=eqtl_data %>% left_join(allele_df, by=c("SNP"="snp")) 
-    if(!"ref" %in% colnames(eqtl_data) || !"alt" %in% colnames(eqtl_data)) {
-        # If columns don't exist, try alternate names
-        if(!"effect_allele" %in% colnames(allele_df) || !"other_allele" %in% colnames(allele_df)) {
-            message(paste0(Sys.time(),": Required allele columns not found in allele_df"))
-            return(NULL)
-        }
-        eqtl_data = eqtl_data %>% 
-            rename(eqtl_effect_allele=effect_allele, eqtl_other_allele=other_allele)
-    } else {
-        eqtl_data = eqtl_data %>% 
-            rename(eqtl_effect_allele=ref, eqtl_other_allele=alt)
-    }
+    eqtl_data = eqtl_data %>% rename(eqtl_effect_allele=ref, eqtl_other_allele=alt)
     
-    # Filter GWAS data for the lead SNP
-    gwas_data=gwas_data %>% filter(SNP==lead_snp)
-    if(nrow(gwas_data)==0){
-        message(paste0(Sys.time(),": Lead SNP ",lead_snp," not found in GWAS data"))
+    # Filter GWAS data for the lead SNP using rsid column
+    gwas_data = gwas_data %>% filter(rsid == lead_snp)
+    if(nrow(gwas_data) == 0){
+        message(paste0(Sys.time(), ": Lead SNP ", lead_snp, " not found in GWAS data"))
         return(NULL)
     }
     
-    # Handle different column naming in GWAS data
-    if("A1" %in% colnames(gwas_data) && "A2" %in% colnames(gwas_data)) {
-        gwas_data = gwas_data %>% rename(gwas_effect_allele=A2, gwas_other_allele=A1)
-    } else if("effect_allele" %in% colnames(gwas_data) && "other_allele" %in% colnames(gwas_data)) {
-        gwas_data = gwas_data %>% rename(gwas_effect_allele=effect_allele, gwas_other_allele=other_allele)
-    } else {
-        message(paste0(Sys.time(),": Required allele columns not found in GWAS data"))
-        return(NULL)
-    }
+    # Use A1 and A2 as effect alleles
+    gwas_data = gwas_data %>% rename(gwas_effect_allele = A2, gwas_other_allele = A1)
 
     # Create MR dataframe
-    mr_df=data.frame(
-        SNP=eqtl_data$SNP,
-        eqtl_effect_allele=eqtl_data$eqtl_effect_allele,
-        eqtl_other_allele=eqtl_data$eqtl_other_allele,
-        gwas_effect_allele=gwas_data$gwas_effect_allele,
-        gwas_other_allele=gwas_data$gwas_other_allele,
-        eqtl_beta=eqtl_data$beta,
-        eqtl_se=eqtl_data$se,
-        gwas_beta=gwas_data$BETA,
-        gwas_se=gwas_data$SE
+    mr_df = data.frame(
+        SNP = eqtl_data$SNP,
+        eqtl_effect_allele = eqtl_data$eqtl_effect_allele,
+        eqtl_other_allele = eqtl_data$eqtl_other_allele,
+        gwas_effect_allele = gwas_data$gwas_effect_allele,
+        gwas_other_allele = gwas_data$gwas_other_allele,
+        eqtl_beta = eqtl_data$beta,
+        eqtl_se = eqtl_data$se,
+        gwas_beta = gwas_data$BETA,
+        gwas_se = gwas_data$SE
     )
 
     # Harmonize alleles (flip beta if allele orientations don't match)
