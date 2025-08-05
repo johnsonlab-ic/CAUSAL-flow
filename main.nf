@@ -116,6 +116,23 @@ workflow{
             return tuple(file, gwas_name)
         }
     
+    // Log GWAS processing results
+    gwas_ch.count().view { total_gwas -> 
+        log.info "Total GWAS files to process: ${total_gwas}"
+    }
+    
+    gwas_data_ch.count().view { successful_gwas -> 
+        gwas_ch.count().subscribe { total_gwas ->
+            def failed_count = total_gwas - successful_gwas
+            if (failed_count > 0) {
+                log.info "GWAS Processing Summary: ${successful_gwas}/${total_gwas} successful, ${failed_count} failed"
+                log.warn "Warning: ${failed_count} GWAS file(s) failed during clumping and will be excluded from colocalization analysis"
+            } else {
+                log.info "GWAS Processing Summary: All ${total_gwas} GWAS files processed successfully"
+            }
+        }
+    }
+    
     // Step 2: Create combinations of GWAS and eQTL data
     coloc_inputs_ch = gwas_data_ch.combine(eqtl_ch)
     

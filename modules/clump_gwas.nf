@@ -1,6 +1,7 @@
 process clump_gwas {
     tag "Clumping ${gwas_name}"
     label 'process_medium'
+    errorStrategy 'ignore'
     
     publishDir "${params.outdir}/clumped_gwas/", mode: 'copy'
     
