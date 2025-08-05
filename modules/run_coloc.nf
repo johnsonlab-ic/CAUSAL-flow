@@ -36,7 +36,7 @@ process run_coloc {
     library(data.table)
     
     # Load and process GWAS data
-    processed_gwas <- readRDS("${gwas_data}") 
+    processed_gwas <- readRDS("${gwas_data}")
     if(grepl("chr", processed_gwas\$chr[1]) == FALSE) {
       processed_gwas\$chr <- paste0("chr", processed_gwas\$chr)
     }

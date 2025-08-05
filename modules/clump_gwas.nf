@@ -43,6 +43,11 @@ process clump_gwas {
         path_to_binaries = "/app/CAUSAL-flow/EUR"
     )
     
+    # Check if regions is NULL and throw error if so
+    if (is.null(regions)) {
+        stop("ERROR: select_regions() returned NULL. No significant regions found for GWAS: $gwas_name")
+    }
+    
     # Save results
     saveRDS(regions, paste0("$gwas_name","_clumped_gwas.rds"))
     
