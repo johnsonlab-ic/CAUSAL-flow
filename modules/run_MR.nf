@@ -140,8 +140,12 @@ process combine_MR {
     # Load required libraries
     library(data.table)
     
-    # List all MR result files
-    file_list <- strsplit("${mr_files}", " ")[[1]]
+        # Collect staged MR result files directly from the task working directory.
+        # This avoids breaking paths when file names contain spaces.
+        file_list <- list.files(pattern = "^mr_results_.*\\.txt$", full.names = TRUE)
+        if (length(file_list) == 0) {
+            stop("No MR result files were staged for combine_MR")
+        }
     
     # Read and combine all files
     all_results <- lapply(file_list, function(file) {

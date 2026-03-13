@@ -107,8 +107,12 @@ process combine_coloc {
     # Load required libraries
     library(data.table)
     
-    # List all coloc result files
-    file_list <- strsplit("${coloc_files}", " ")[[1]]
+    # Collect staged coloc result files directly from the task working directory.
+    # This avoids breaking paths when file names contain spaces.
+    file_list <- list.files(pattern = "^coloc_results_.*\\.txt$", full.names = TRUE)
+    if (length(file_list) == 0) {
+      stop("No coloc result files were staged for combine_coloc")
+    }
     
     # Read and combine all files
     all_results <- lapply(file_list, function(file) {
