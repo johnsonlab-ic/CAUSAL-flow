@@ -142,7 +142,7 @@ process combine_MR {
     
         # Collect staged MR result files directly from the task working directory.
         # This avoids breaking paths when file names contain spaces.
-        file_list <- list.files(pattern = "^mr_results_.*\\.txt", full.names = TRUE)
+        file_list <- list.files(pattern = "^mr_results_.*[.]txt", full.names = TRUE)
         if (length(file_list) == 0) {
             stop("No MR result files were staged for combine_MR")
         }
