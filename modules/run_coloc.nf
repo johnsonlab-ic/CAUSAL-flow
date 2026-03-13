@@ -109,7 +109,7 @@ process combine_coloc {
     
     # Collect staged coloc result files directly from the task working directory.
     # This avoids breaking paths when file names contain spaces.
-    file_list <- list.files(pattern = "^coloc_results_.*\\.txt$", full.names = TRUE)
+    file_list <- list.files(pattern = "^coloc_results_.*\\.txt", full.names = TRUE)
     if (length(file_list) == 0) {
       stop("No coloc result files were staged for combine_coloc")
     }
