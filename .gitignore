@@ -2,3 +2,4 @@ jupyter_notebooks/
 old_source_files/
 personal/
 .nextflow/
+.claude/
