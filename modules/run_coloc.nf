@@ -63,6 +63,21 @@ process run_coloc {
     
     # Load eQTL data
     eqtls <- readRDS("${eqtl_data}")
+
+    # Colocalization needs the full set of tested SNP-gene associations per region
+    # (coloc.abf compares H3 vs H4 across all tested SNPs); an FDR/p-value-filtered
+    # eQTL file silently starves regions down to a handful of SNPs and produces
+    # unreliable PP.H4 estimates. Flag the common case where every row already
+    # cleared a significance filter.
+    if (nrow(eqtls) > 0 && "FDR" %in% names(eqtls) && all(eqtls\$FDR <= 0.05, na.rm = TRUE)) {
+      cat(paste0(
+        "WARNING: eQTL input '${eqtl_name}' looks FDR-filtered (every row has FDR <= 0.05). ",
+        "coloc requires the FULL (unfiltered) set of tested SNP-gene associations per region, ",
+        "not just significant hits, or PP.H4 estimates will be unreliable, especially where nsnps is low. ",
+        "Point --eqtl_dir/--eqtl_pattern at the unfiltered eQTL output instead.\\n"
+      ))
+    }
+
     eqtl_list <- lapply(genestokeep, function(x) {
       eqtls[eqtls\$gene %in% x, ]
     })

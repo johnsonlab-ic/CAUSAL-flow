@@ -20,6 +20,7 @@ nextflow.enable.dsl = 2
 include { clump_gwas } from './modules/clump_gwas'
 include { run_coloc; combine_coloc } from './modules/run_coloc'
 include { run_MR; combine_MR } from './modules/run_MR'
+include { annotate_gene_symbols as annotate_coloc_symbols; annotate_gene_symbols as annotate_MR_symbols } from './modules/annotate_symbols'
 // include { PLOT_RESULTS } from './modules/plot_results'
 // include { GENERATE_REPORT } from './modules/generate_report'
 
@@ -86,15 +87,15 @@ workflow{
     if (params.eqtl_file) {
         // Single eQTL file
         eqtl_ch = Channel.fromPath(params.eqtl_file)
-            .map { file -> 
-                def eqtl_name = file.name.toString().replaceFirst(/(.+)_cis_MatrixEQTLout\.rds/, '$1')
+            .map { file ->
+                def eqtl_name = file.name.toString().replaceFirst(/(.+)_cis_.*\.rds$/, '$1')
                 return tuple(file, eqtl_name)
             }
     } else {
         // Multiple eQTL files from directory (default)
         eqtl_ch = Channel.fromPath("${params.eqtl_dir}/${params.eqtl_pattern}")
-            .map { file -> 
-                def eqtl_name = file.name.toString().replaceFirst(/(.+)_cis_MatrixEQTLout\.rds/, '$1')
+            .map { file ->
+                def eqtl_name = file.name.toString().replaceFirst(/(.+)_cis_.*\.rds$/, '$1')
                 return tuple(file, eqtl_name)
             }
     }
@@ -150,7 +151,14 @@ workflow{
         coloc_results_ch.results_table.collect(),
         params.coloc_pph4_threshold
     )
-    
+
+    // Step 4b: Add a gene-symbol column if the combined results are mostly Ensembl IDs
+    annotate_coloc_symbols(
+        "${baseDir}/R/annotate_gene_symbols_functions.R",
+        combine_coloc_ch.combined_results,
+        "coloc_results"
+    )
+
     // Check if allele file is provided for MR analysis
     if (params.allele_file) {
         log.info "Running Mendelian Randomization analysis..."
@@ -167,9 +175,16 @@ workflow{
         )
         
         // Step 7: Combine all MR results
-        combine_MR(
+        combine_MR_ch = combine_MR(
             mr_results_ch.results_table.collect(),
             params.mr_pval_threshold  // P-value threshold for MR results
+        )
+
+        // Step 7b: Add a gene-symbol column if the combined MR results are mostly Ensembl IDs
+        annotate_MR_symbols(
+            "${baseDir}/R/annotate_gene_symbols_functions.R",
+            combine_MR_ch.combined_results,
+            "mr_results"
         )
     } else {
         log.info "Skipping MR analysis as allele file is not provided. Set params.allele_file to run MR."
