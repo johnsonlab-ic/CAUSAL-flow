@@ -51,7 +51,8 @@ RUN R -e "install.packages(c( \
     'signif', \
     'optparse', \
     'readr', \
-    'writexl' \
+    'writexl', \
+    'DT' \
     ), repos='https://cran.r-project.org/')"
 
 # Install ieugwasr

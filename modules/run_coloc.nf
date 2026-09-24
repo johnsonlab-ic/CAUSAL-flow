@@ -3,6 +3,7 @@ process run_coloc {
     label 'process_high'
     
     publishDir "${params.outdir}/coloc_results", mode: 'copy', pattern: "coloc_results_*.txt"
+    publishDir "${params.outdir}/report_cache/eqtl_chunks", mode: 'copy', pattern: "report_cache_eqtl_*.rds"
     
     input:
     path source_R
@@ -10,10 +11,12 @@ process run_coloc {
     val gwas_name
     tuple path(eqtl_data), val(eqtl_name)
     path gene_loc_file
+    val do_report
     
     output:
     path "coloc_results_${eqtl_name}_${gwas_name}.txt", emit: results_table
     tuple path(gwas_data), val(gwas_name), path(eqtl_data), val(eqtl_name), path("coloc_results_${eqtl_name}_${gwas_name}.txt"), emit: coloc_complete
+    path "report_cache_eqtl_${eqtl_name}_${gwas_name}.rds", optional: true, emit: report_cache
 
         
     script:
@@ -81,6 +84,14 @@ process run_coloc {
     eqtl_list <- lapply(genestokeep, function(x) {
       eqtls[eqtls\$gene %in% x, ]
     })
+
+    # Optional: cache the per-region eQTL subset already computed above, for
+    # later report generation. Costs nothing extra -- eqtl_list is already in
+    # memory here, so this avoids a separate process re-reading the (huge)
+    # raw eQTL file just to redo the same region/gene filtering.
+    if (toupper("${do_report}") == "TRUE") {
+      saveRDS(eqtl_list, "report_cache_eqtl_${eqtl_name}_${gwas_name}.rds")
+    }
     
     # Set output files
     output_file <- paste0("coloc_results_", eqtl_name, "_${gwas_name}.txt")

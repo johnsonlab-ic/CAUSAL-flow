@@ -21,6 +21,7 @@ include { clump_gwas } from './modules/clump_gwas'
 include { run_coloc; combine_coloc } from './modules/run_coloc'
 include { run_MR; combine_MR } from './modules/run_MR'
 include { annotate_gene_symbols as annotate_coloc_symbols; annotate_gene_symbols as annotate_MR_symbols } from './modules/annotate_symbols'
+include { cache_ld_chunks } from './modules/cache_ld_chunks'
 // include { PLOT_RESULTS } from './modules/plot_results'
 // include { GENERATE_REPORT } from './modules/generate_report'
 
@@ -46,6 +47,7 @@ params.eqtl_file=null           // Single eQTL file (optional, takes precedence 
 params.eqtl_pattern="*_cis_MatrixEQTLout.rds" // Pattern to match eQTL files
 params.gene_location_file="/var/lib/docker/alex_tmp/data/CAUSAL-flow_test/sc_eqtls/expression_matrices/gene_locations.csv"
 params.allele_file=null// File with allele information
+params.report=false // If true, cache per-region LD + per-celltype/region eQTL subsets for later report generation (no report is built yet)
 
 //MR parameters
 params.eqtl_fdr_threshold=0.05 // FDR threshold for eQTLs 
@@ -63,6 +65,7 @@ log.info """\
          eQTL FDR threshold: ${params.eqtl_fdr_threshold}
          MR p-value threshold: ${params.mr_pval_threshold}
          Allele file  : ${params.allele_file}
+         Report cache : ${params.report}
          """
          .stripIndent()
 
@@ -134,6 +137,13 @@ workflow{
         }
     }
     
+    // Optional: cache per-region LD chunks for later report generation.
+    // Only needs clump_gwas's output, so this runs in parallel with the
+    // coloc analysis below rather than waiting on it.
+    if (params.report) {
+        cache_ld_chunks(gwas_data_ch)
+    }
+
     // Step 2: Create combinations of GWAS and eQTL data
     coloc_inputs_ch = gwas_data_ch.combine(eqtl_ch)
     
@@ -143,7 +153,8 @@ workflow{
         coloc_inputs_ch.map{it[0]},  // gwas_data
         coloc_inputs_ch.map{it[1]},  // gwas_name
         coloc_inputs_ch.map{tuple(it[2], it[3])},  // eqtl tuple
-        file(params.gene_location_file)
+        file(params.gene_location_file),
+        coloc_inputs_ch.map{ params.report ? 'TRUE' : 'FALSE' }
     )
     
     // Step 4: Combine all colocalization results and filter by PP.H4 threshold

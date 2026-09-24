@@ -32,7 +32,7 @@ annotate_gene_symbols <- function(input_file, output_file, gene_col = "gene", th
     return(invisible(dat))
   }
 
-  message("Above threshold; mapping Ensembl IDs to gene symbols via EnsDb.Hsapiens.v86.")
+  message("Above threshold; mapping Ensembl IDs to gene symbols + biotype via EnsDb.Hsapiens.v86.")
   ensembl_id <- sub("\\..*$", "", gene_vals)
   symbol <- suppressMessages(mapIds(
     EnsDb.Hsapiens.v86,
@@ -44,12 +44,26 @@ annotate_gene_symbols <- function(input_file, output_file, gene_col = "gene", th
   symbol <- unname(symbol)
   symbol[is.na(symbol)] <- dat[[gene_col]][is.na(symbol)]
 
+  # Biotype (protein_coding, lncRNA, pseudogene, ...) lets downstream plots
+  # (e.g. the coloc report's gene track) de-emphasize non-coding genes instead
+  # of treating every gene in a region as equally label-worthy.
+  biotype <- suppressMessages(mapIds(
+    EnsDb.Hsapiens.v86,
+    keys = ensembl_id,
+    column = "GENEBIOTYPE",
+    keytype = "GENEID",
+    multiVals = "first"
+  ))
+  biotype <- unname(biotype)
+  biotype[is.na(biotype)] <- "unknown"
+
   gene_pos <- which(names(dat) == gene_col)
   dat[, symbol := symbol]
+  dat[, biotype := biotype]
   # names(dat) is re-read post-assignment (rather than reusing a pre-assignment
   # snapshot) because data.table's `:=` mutates column-name attributes by
   # reference, which can silently alias an earlier `names(dat)` capture.
-  new_order <- append(setdiff(names(dat), "symbol"), "symbol", after = gene_pos)
+  new_order <- append(setdiff(names(dat), c("symbol", "biotype")), c("symbol", "biotype"), after = gene_pos)
   setcolorder(dat, new_order)
 
   message(sprintf("Resolved %d/%d symbols.", sum(symbol != dat[[gene_col]]), nrow(dat)))
