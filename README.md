@@ -121,6 +121,9 @@ nextflow run main.nf -profile cluster --gwas_file <path> --eqtl_file <path>
 | `--pvalue` | P-value threshold for GWAS clumping | 5e-6 |
 | `--window_size` | Window size for clumping in base pairs | 1e6 |
 | `--coloc_pph4_threshold` | Threshold for PP.H4 to filter results | 0.2 |
+| `--allele_file` | In-sample MAF file (sceQTL-flow `MAF_mat.csv`); used for eQTL sdY estimation and MR | null |
+| `--eqtl_summary_file` | sceQTL-flow `eqtl_summary.csv`; per-celltype N (`n_individuals`) for eQTL sdY estimation | null |
+| `--eqtl_sdY` | eQTL phenotype SD for coloc: `estimate` (from MAF + N, correct at any scale) or a number (e.g. `1` for standardised eQTLs). A fixed value is still checked against the estimate and flagged if they differ >2x | estimate |
 | `--outdir` | Output directory | Required |
 
 ## Output

@@ -12,7 +12,10 @@ process run_coloc {
     tuple path(eqtl_data), val(eqtl_name)
     path gene_loc_file
     val do_report
-    
+    val eqtl_sdY
+    path allele_file, stageAs: 'eqtl_maf.csv'
+    path eqtl_summary_file, stageAs: 'eqtl_summary.csv'
+
     output:
     path "coloc_results_${eqtl_name}_${gwas_name}.txt", emit: results_table
     tuple path(gwas_data), val(gwas_name), path(eqtl_data), val(eqtl_name), path("coloc_results_${eqtl_name}_${gwas_name}.txt"), emit: coloc_complete
@@ -93,16 +96,46 @@ process run_coloc {
       saveRDS(eqtl_list, "report_cache_eqtl_${eqtl_name}_${gwas_name}.rds")
     }
     
+    # eQTL sdY: "estimate" (from MAF + N) or a fixed number. MAF and N are also
+    # used for the mismatch guardrail when a fixed number is given. Empty
+    # staged files mean the input wasn't supplied (see NO_FILE in main.nf).
+    eqtl_sdY_mode <- "${eqtl_sdY}"
+    if (eqtl_sdY_mode != "estimate") eqtl_sdY_mode <- as.numeric(eqtl_sdY_mode)
+
+    eqtl_n <- NA_real_
+    if (file.size("eqtl_summary.csv") > 0) {
+      eqtl_summary <- fread("eqtl_summary.csv")
+      eqtl_n <- as.numeric(eqtl_summary[celltype == eqtl_name]\$n_individuals[1])
+    }
+
+    eqtl_maf <- NULL
+    if (file.size("eqtl_maf.csv") > 0) {
+      maf_dt <- fread("eqtl_maf.csv", select = c("snp", "maf"))
+      maf_dt <- maf_dt[snp %in% unlist(lapply(processed_gwas, function(x) x\$rsid))]
+      eqtl_maf <- setNames(maf_dt\$maf, maf_dt\$snp)
+    }
+
+    if (identical(eqtl_sdY_mode, "estimate") && (is.na(eqtl_n) || is.null(eqtl_maf))) {
+      stop(paste0("--eqtl_sdY estimate needs N and MAF for celltype '", eqtl_name, "': ",
+                  "not found in --eqtl_summary_file (n_individuals) and/or --allele_file (maf)."))
+    }
+    if (is.na(eqtl_n) || is.null(eqtl_maf)) {
+      cat("WARNING: no N and/or MAF for '${eqtl_name}'; sdY mismatch guardrail disabled.\\n")
+    }
+
+    sdy_opts <- list(mode = eqtl_sdY_mode, n = eqtl_n, maf = eqtl_maf)
+
     # Set output files
     output_file <- paste0("coloc_results_", eqtl_name, "_${gwas_name}.txt")
-    
-    
+
+
     # Run colocalization
     coloc_results <- run_all_coloc(
       processed_gwas = processed_gwas,
       eqtl_list = eqtl_list,
       trait_type = trait_type,
       celltype = eqtl_name,
+      sdy_opts = sdy_opts,
       output_file = output_file
     )
     coloc_results\$GWAS=gwas_name

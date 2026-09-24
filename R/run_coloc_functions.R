@@ -10,6 +10,47 @@ library(tidyverse)
 library(data.table)
 library(coloc)
 
+#' Decide the eQTL phenotype SD (sdY) coloc uses for one gene
+#'
+#' coloc's effect-size prior is scaled by sdY, so a hardcoded sdY = 1 is only
+#' correct for standardised eQTL outputs -- on unstandardised inputs it silently
+#' distorts PP.H4. Estimating from varbeta + MAF + N is correct whatever the
+#' input's scale. When a fixed sdY is supplied, the estimate is still computed
+#' and a >2x disagreement is flagged as a likely scale mismatch.
+#'
+#' @param varbeta eQTL effect variances for the gene's SNPs
+#' @param snps SNP ids matching varbeta
+#' @param sdy_opts list(mode = "estimate" or a number, n = eQTL sample size, maf = named MAF vector)
+#' @return list(used, est), or NULL if estimation was requested but impossible
+resolve_eqtl_sdY <- function(varbeta, snps, sdy_opts, gene_name, celltype) {
+  est <- NA_real_
+  if (!is.null(sdy_opts$maf) && !is.na(sdy_opts$n)) {
+    maf <- unname(sdy_opts$maf[snps])
+    ok <- !is.na(maf) & maf > 0 & maf < 1 & is.finite(varbeta) & varbeta > 0
+    # sdY.est warns "please directly supply sdY if known" on every call; here
+    # estimating is deliberate, so that warning is noise.
+    if (any(ok)) est <- suppressWarnings(coloc:::sdY.est(varbeta[ok], maf[ok], sdy_opts$n))
+  }
+
+  if (identical(sdy_opts$mode, "estimate")) {
+    if (is.na(est)) {
+      message(paste0("Cannot estimate sdY for gene ", gene_name, " in ", celltype,
+                     " (no SNPs with MAF, or no N); skipping gene."))
+      return(NULL)
+    }
+    return(list(used = est, est = est))
+  }
+
+  used <- as.numeric(sdy_opts$mode)
+  if (!is.na(est) && (est / used > 2 || est / used < 0.5)) {
+    message(sprintf(paste0("WARNING: sdY mismatch for gene %s in %s: using sdY = %.3g but ",
+                           "MAF + N estimate is %.3g. The eQTL input is probably not on the ",
+                           "scale you assumed; consider --eqtl_sdY estimate."),
+                    gene_name, celltype, used, est))
+  }
+  list(used = used, est = est)
+}
+
 #' Run colocalization analysis for a single gene within a GWAS region
 #'
 #' @param gwas_data GWAS data for a specific region
@@ -18,9 +59,10 @@ library(coloc)
 #' @param trait_type Type of GWAS trait ("quant" or "cc")
 #' @param celltype Name of the cell type for eQTL data
 #' @param region_name Name of the genomic region
+#' @param sdy_opts eQTL sdY settings, see resolve_eqtl_sdY()
 #'
 #' @return Named vector with colocalization results
-run_single_coloc <- function(gwas_data, eqtl_data, gene_name, trait_type, celltype, region_name) {
+run_single_coloc <- function(gwas_data, eqtl_data, gene_name, trait_type, celltype, region_name, sdy_opts) {
   # Filter eQTL data for the specified gene
   gene_eqtl_data <- eqtl_data %>% filter(gene == gene_name)
   
@@ -52,13 +94,19 @@ run_single_coloc <- function(gwas_data, eqtl_data, gene_name, trait_type, cellty
   )
   
   # Prepare eQTL input for coloc
-  coloc_eqtl_input <- eqtl_subset %>% mutate(se = (beta/t.stat))
+  eqtl_beta <- as.numeric(eqtl_subset$beta)
+  eqtl_varbeta <- (eqtl_beta / as.numeric(eqtl_subset$t.stat))^2
+  eqtl_snps <- as.character(eqtl_subset$SNP)
+
+  sdy <- resolve_eqtl_sdY(eqtl_varbeta, eqtl_snps, sdy_opts, gene_name, celltype)
+  if (is.null(sdy)) return(NULL)
+
   coloc_eqtl_input <- list(
-    beta = as.numeric(coloc_eqtl_input$beta),
-    varbeta = as.numeric(coloc_eqtl_input$se)^2,
-    snp = as.character(coloc_eqtl_input$SNP),
+    beta = eqtl_beta,
+    varbeta = eqtl_varbeta,
+    snp = eqtl_snps,
     type = "quant",
-    sdY = 1
+    sdY = sdy$used
   )
   
   # Run coloc analysis
@@ -119,19 +167,23 @@ run_single_coloc <- function(gwas_data, eqtl_data, gene_name, trait_type, cellty
     snph4, 
     eqtl_pval, 
     eqtl_fdr, 
-    gwas_pval, 
+    gwas_pval,
+    sdy$used,
+    sdy$est,
     resvec
   )
-  
+
   names(full_result) <- c(
-    "region", 
-    "celltype", 
-    "gene", 
+    "region",
+    "celltype",
+    "gene",
     "lead_snp",
-    "SNP.PP.H4", 
-    "eQTL_pval", 
-    "eQTL_FDR", 
-    "GWAS_pval", 
+    "SNP.PP.H4",
+    "eQTL_pval",
+    "eQTL_FDR",
+    "GWAS_pval",
+    "eQTL_sdY",
+    "eQTL_sdY_est",
     "nsnps",
     "PP.H0", 
     "PP.H1", 
@@ -150,9 +202,10 @@ run_single_coloc <- function(gwas_data, eqtl_data, gene_name, trait_type, cellty
 #' @param eqtl_list List of eQTL data frames by region
 #' @param trait_type Type of GWAS trait ("quant" or "cc")
 #' @param celltype Name of the cell type for eQTL data
+#' @param sdy_opts eQTL sdY settings, see resolve_eqtl_sdY()
 #'
 #' @return Data frame of colocalization results for all genes in the region
-run_region_coloc <- function(region_index, processed_gwas, eqtl_list, trait_type, celltype) {
+run_region_coloc <- function(region_index, processed_gwas, eqtl_list, trait_type, celltype, sdy_opts) {
   # Get region data
   region_name <- names(processed_gwas)[region_index]
   gwas_data <- processed_gwas[[region_index]]
@@ -200,7 +253,8 @@ run_region_coloc <- function(region_index, processed_gwas, eqtl_list, trait_type
       gene_name = gene_name,
       trait_type = trait_type,
       celltype = celltype,
-      region_name = region_name
+      region_name = region_name,
+      sdy_opts = sdy_opts
     )
     
     if(!is.null(result)) {
@@ -212,7 +266,7 @@ run_region_coloc <- function(region_index, processed_gwas, eqtl_list, trait_type
   if(length(all_results) > 0) {
     results_df <- as.data.frame(do.call(rbind, all_results))
     # Convert numeric columns to numeric
-    numeric_cols <- c("SNP.PP.H4", "eQTL_pval", "eQTL_FDR", "GWAS_pval", 
+    numeric_cols <- c("SNP.PP.H4", "eQTL_pval", "eQTL_FDR", "GWAS_pval", "eQTL_sdY", "eQTL_sdY_est",
                      "nsnps", "PP.H0", "PP.H1", "PP.H2", "PP.H3", "PP.H4")
     results_df[numeric_cols] <- lapply(results_df[numeric_cols], as.numeric)
     return(results_df)
@@ -227,10 +281,11 @@ run_region_coloc <- function(region_index, processed_gwas, eqtl_list, trait_type
 #' @param eqtl_list List of eQTL data frames by region
 #' @param trait_type Type of GWAS trait ("quant" or "cc")
 #' @param celltype Name of the cell type for eQTL data
+#' @param sdy_opts eQTL sdY settings, see resolve_eqtl_sdY()
 #' @param output_file Optional file path to save the results
 #'
 #' @return Data frame with all colocalization results
-run_all_coloc <- function(processed_gwas, eqtl_list, trait_type, celltype, output_file = NULL) {
+run_all_coloc <- function(processed_gwas, eqtl_list, trait_type, celltype, sdy_opts, output_file = NULL) {
   all_region_results <- list()
   
   # Check that processed_gwas and eqtl_list have the same length
@@ -245,7 +300,8 @@ run_all_coloc <- function(processed_gwas, eqtl_list, trait_type, celltype, outpu
       processed_gwas = processed_gwas,
       eqtl_list = eqtl_list,
       trait_type = trait_type,
-      celltype = celltype
+      celltype = celltype,
+      sdy_opts = sdy_opts
     )
     
     if(!is.null(region_results)) {
@@ -258,7 +314,7 @@ run_all_coloc <- function(processed_gwas, eqtl_list, trait_type, celltype, outpu
     final_results <- do.call(rbind, all_region_results)
     
     # Round numeric values for readability
-    numeric_cols <- c("SNP.PP.H4", "eQTL_pval", "eQTL_FDR", "GWAS_pval", 
+    numeric_cols <- c("SNP.PP.H4", "eQTL_pval", "eQTL_FDR", "GWAS_pval", "eQTL_sdY", "eQTL_sdY_est",
                      "nsnps", "PP.H0", "PP.H1", "PP.H2", "PP.H3", "PP.H4")
     final_results[numeric_cols] <- lapply(final_results[numeric_cols], function(x) {
       if(is.numeric(x)) signif(x, 6) else x

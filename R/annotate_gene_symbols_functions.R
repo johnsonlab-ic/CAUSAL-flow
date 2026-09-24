@@ -12,6 +12,11 @@ library(EnsDb.Hsapiens.v86)
 #' @param gene_col Name of the column holding gene identifiers
 #' @param threshold Fraction of gene values that must match ^ENSG\\d+ to trigger annotation
 annotate_gene_symbols <- function(input_file, output_file, gene_col = "gene", threshold = 0.5) {
+  # e.g. no MR hits at all -> combine_MR writes a blank file, which fread rejects
+  if (all(trimws(readLines(input_file, n = 5, warn = FALSE)) == "")) {
+    message("Input file is empty; leaving it unchanged.")
+    return(invisible(NULL))
+  }
   dat <- fread(input_file)
 
   if (!gene_col %in% names(dat) || nrow(dat) == 0) {

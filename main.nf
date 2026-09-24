@@ -48,6 +48,8 @@ params.eqtl_pattern="*_cis_MatrixEQTLout.rds" // Pattern to match eQTL files
 params.gene_location_file="/var/lib/docker/alex_tmp/data/CAUSAL-flow_test/sc_eqtls/expression_matrices/gene_locations.csv"
 params.allele_file=null// File with allele information
 params.report=false // If true, cache per-region LD + per-celltype/region eQTL subsets for later report generation (no report is built yet)
+params.eqtl_sdY='estimate' // eQTL phenotype SD for coloc: 'estimate' (from MAF + N, correct at any scale) or a number (e.g. 1 for standardised eQTLs)
+params.eqtl_summary_file=null // sceQTL-flow eqtl_summary.csv; provides per-celltype N (n_individuals) for sdY estimation
 
 //MR parameters
 params.eqtl_fdr_threshold=0.05 // FDR threshold for eQTLs 
@@ -66,10 +68,22 @@ log.info """\
          MR p-value threshold: ${params.mr_pval_threshold}
          Allele file  : ${params.allele_file}
          Report cache : ${params.report}
+         eQTL sdY     : ${params.eqtl_sdY}
+         eQTL summary : ${params.eqtl_summary_file}
          """
          .stripIndent()
 
 workflow{
+    def sdY = params.eqtl_sdY.toString()
+    if (sdY != 'estimate' && !sdY.isNumber()) {
+        error "--eqtl_sdY must be 'estimate' or a number, got '${sdY}'"
+    }
+    if (sdY == 'estimate' && (!params.allele_file || !params.eqtl_summary_file)) {
+        error "--eqtl_sdY estimate (the default) needs --allele_file (MAF) and --eqtl_summary_file (per-celltype N). " +
+              "Supply both, or pass a number (e.g. --eqtl_sdY 1) if your eQTL inputs are standardised."
+    }
+    def no_file = "${projectDir}/assets/NO_FILE"
+
     // Create GWAS channel - either from a single file or a directory
     if (params.gwas_dir) {
         // Multiple GWAS files from directory
@@ -154,7 +168,10 @@ workflow{
         coloc_inputs_ch.map{it[1]},  // gwas_name
         coloc_inputs_ch.map{tuple(it[2], it[3])},  // eqtl tuple
         file(params.gene_location_file),
-        coloc_inputs_ch.map{ params.report ? 'TRUE' : 'FALSE' }
+        coloc_inputs_ch.map{ params.report ? 'TRUE' : 'FALSE' },
+        sdY,
+        file(params.allele_file ?: no_file),
+        file(params.eqtl_summary_file ?: no_file)
     )
     
     // Step 4: Combine all colocalization results and filter by PP.H4 threshold
