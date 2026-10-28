@@ -123,7 +123,8 @@ workflow{
         gwas_ch.map{it[0]},  // Extract just the file
         gwas_ch.map{params.pvalue},
         gwas_ch.map{params.window_size},
-        gwas_ch.map{it[1]}   // Extract just the gwas_name
+        gwas_ch.map{it[1]},  // Extract just the gwas_name
+        file(params.allele_file ?: no_file)
     )
     
     // Create a combined channel with clumped data and original gwas name

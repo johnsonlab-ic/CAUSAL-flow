@@ -1,6 +1,33 @@
 # Function to select genomic regions from GWAS data
 # Expects GWAS data with columns: SNP, CHR, BP, P, etc.
 
+# Multiallelic sites split into one row per alt allele share an rsID. coloc.abf
+# errors on duplicated SNP ids and run_coloc drops every gene in that region, so
+# keep only the copy whose alleles match the eQTL genotypes (ref/alt from the
+# allele file, either orientation). Duplicated rsIDs with no unique match, or
+# all of them when no allele file is given, are dropped.
+dedup_multiallelic <- function(gwas, allele_file = NULL) {
+  dup_ids <- unique(gwas$SNP[duplicated(gwas$SNP)])
+  if (length(dup_ids) == 0) return(gwas)
+
+  dup_rows <- which(gwas$SNP %in% dup_ids)
+  keep_dup <- rep(FALSE, length(dup_rows))
+  if (!is.null(allele_file) && all(c("A1", "A2") %in% names(gwas))) {
+    alleles <- data.table::fread(allele_file, select = c("snp", "ref", "alt"))
+    d <- gwas[dup_rows, c("SNP", "A1", "A2")]
+    idx <- match(d$SNP, alleles$snp)
+    ref <- alleles$ref[idx]
+    alt <- alleles$alt[idx]
+    matched <- !is.na(idx) & ((d$A1 == ref & d$A2 == alt) | (d$A1 == alt & d$A2 == ref))
+    n_matched <- table(d$SNP[matched])
+    keep_dup <- matched & d$SNP %in% names(n_matched)[n_matched == 1]
+  }
+
+  message("Duplicated rsIDs (multiallelic): ", length(dup_ids), "; kept ", sum(keep_dup),
+          " copies matching eQTL alleles, dropped ", length(dup_rows) - sum(keep_dup), " rows")
+  gwas[-dup_rows[!keep_dup], ]
+}
+
 new_ld_clump_local <- function(dat, clump_kb, clump_r2, clump_p, bfile, plink_bin)
 {
     # Create a local temp directory

@@ -11,7 +11,8 @@ process clump_gwas {
     val pvalue
     val window_size
     val gwas_name
-    
+    path allele_file, stageAs: 'eqtl_alleles.csv'
+
     output:
     path "*clumped_gwas.rds", emit: clumped_gwas
     
@@ -28,6 +29,7 @@ process clump_gwas {
     source("$source_R")
     # Load example GWAS data
     gwas <- fread("$gwas_file")
+    gwas <- dedup_multiallelic(gwas, if (file.size("eqtl_alleles.csv") > 0) "eqtl_alleles.csv" else NULL)
 
     list.files("/app/CAUSAL-flow")
     # Define parameters
